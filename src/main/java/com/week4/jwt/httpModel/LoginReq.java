@@ -1,11 +1,11 @@
 package com.week4.jwt.httpModel;
 
-import lombok.Getter;
+import lombok.Data;
 
 import javax.validation.constraints.Email;
 import javax.validation.constraints.NotBlank;
 
-@Getter
+@Data
 public class LoginReq {
   @NotBlank(message = "username cannot be blank")
   private String username;

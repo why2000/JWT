@@ -2,64 +2,65 @@ package com.week4.jwt.security;
 
 import com.week4.jwt.model.User;
 import io.jsonwebtoken.*;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.core.Authentication;
+import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.stereotype.Component;
 
+import java.io.Serializable;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.function.Function;
 
-import static com.week4.jwt.config.SecurityConfig.EXPIRATION;
+import static com.week4.jwt.config.SecurityConfig.JWT_TOKEN_VALIDITY;
 import static com.week4.jwt.config.SecurityConfig.SECRET;
 
 
 @Component
-public class JwtUtils {
+public class JwtUtils implements Serializable {
+
+  private static final long serialVersionUID = -2550185165626007488L;
 
 
-  public String generateToken(Authentication authentication){
-    User user = (User) authentication.getPrincipal();
-    Date now = new Date(System.currentTimeMillis());
 
-    Date expiryDate = new Date(now.getTime()+ EXPIRATION);
 
-    String userId = Long.toString(user.getId());
+  public String getUsernameFromToken(String token) {
+    return getClaimFromToken(token, Claims::getSubject);
+  }
 
+  public Date getExpirationDateFromToken(String token) {
+    return getClaimFromToken(token, Claims::getExpiration);
+  }
+
+  public <T> T getClaimFromToken(String token, Function<Claims, T> claimsResolver) {
+    final Claims claims = getAllClaimsFromToken(token);
+    return claimsResolver.apply(claims);
+  }
+
+  private Claims getAllClaimsFromToken(String token) {
+    return Jwts.parser().setSigningKey(SECRET).parseClaimsJws(token).getBody();
+  }
+
+  private Boolean isTokenExpired(String token) {
+    final Date expiration = getExpirationDateFromToken(token);
+    return expiration.before(new Date());
+  }
+
+  public String generateToken(UserDetails userDetails) {
     Map<String, Object> claims = new HashMap<>();
-    claims.put("id", (Long.toString(user.getId())));
-    claims.put("username", user.getUsername());
-    claims.put("email",user.getEmail());
-
-    return Jwts.builder()
-        .setSubject(userId)
-        .setClaims(claims)
-        .setIssuedAt(now)
-        .setExpiration(expiryDate)
-        .signWith(SignatureAlgorithm.HS512, SECRET)
-        .compact();
+    return doGenerateToken(claims, userDetails.getUsername());
   }
 
+  private String doGenerateToken(Map<String, Object> claims, String subject) {
 
-  public boolean validateToken(String token){
-    try{
-      Jwts.parser().setSigningKey(SECRET).parseClaimsJws(token);
-      return true;
-    }catch(SignatureException ex){
-      System.out.println("Invalid JWT Signature");
-    }catch(MalformedJwtException ex){
-      System.out.println("Invalid JWT Token");
-    }catch(ExpiredJwtException ex){
-      System.out.println("Unsupported JWT Token");
-    }catch(IllegalArgumentException ex){
-      System.out.println("JWT claims string is empty");
-    }
-    return false;
+    return Jwts.builder().setClaims(claims).setSubject(subject).setIssuedAt(new Date(System.currentTimeMillis()))
+        .setExpiration(new Date(System.currentTimeMillis() + JWT_TOKEN_VALIDITY * 1000))
+        .signWith(SignatureAlgorithm.HS512, SECRET).compact();
   }
 
-
-  public Long getUserId(String token){
-    Claims claims = Jwts.parser().setSigningKey(SECRET).parseClaimsJws(token).getBody();
-    String id = (String) claims.get("id");
-    return Long.parseLong(id);
+  public Boolean validateToken(String token, UserDetails userDetails) {
+    final String username = getUsernameFromToken(token);
+    return (username.equals(userDetails.getUsername()) && !isTokenExpired(token));
   }
 }
