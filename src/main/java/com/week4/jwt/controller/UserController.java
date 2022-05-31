@@ -57,7 +57,7 @@ public class UserController {
     authenticate(loginRequest.getUsername(), loginRequest.getPassword());
 
     final UserDetails userDetails = userService
-        .getUserInfoByUsername(loginRequest.getUsername());
+        .loadUserByUsername(loginRequest.getUsername());
 
     final String token = jwtUtils.generateToken(userDetails);
 

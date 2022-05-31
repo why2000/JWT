@@ -50,7 +50,7 @@ public class JwtFilter extends OncePerRequestFilter {
     // Once we get the token validate it.
     if (username != null && SecurityContextHolder.getContext().getAuthentication() == null) {
 
-      UserDetails userDetails = this.userService.getUserInfoByUsername(username);
+      UserDetails userDetails = this.userService.loadUserByUsername(username);
 
 
       if (jwtUtils.validateToken(jwtToken, userDetails)) {
